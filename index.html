@@ -1,0 +1,1160 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Wolfflix Interactive Experience - The Main Class</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- React & ReactDOM (Production) -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    
+    <!-- Babel for JSX compilation in browser -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap');
+        
+        body { font-family: 'Inter', sans-serif; }
+
+        /* Custom Scrollbar */
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 10px; }
+        
+        /* Fade masks for cinematic covers */
+        .mask-image-gradient { 
+            mask-image: linear-gradient(to bottom, rgba(0,0,0,1) 50%, rgba(0,0,0,0) 100%); 
+            -webkit-mask-image: linear-gradient(to bottom, rgba(0,0,0,1) 50%, rgba(0,0,0,0) 100%); 
+        }
+
+        /* Custom Animations */
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes slideInRight { from { opacity: 0; transform: translateX(30px); } to { opacity: 1; transform: translateX(0); } }
+        @keyframes slideInLeft { from { opacity: 0; transform: translateX(-30px); } to { opacity: 1; transform: translateX(0); } }
+        @keyframes slideInDown { from { opacity: 0; transform: translateY(-20px) translateX(-50%); } to { opacity: 1; transform: translateY(0) translateX(-50%); } }
+        @keyframes pop { 0% { transform: scale(0.8); opacity: 0;} 100% { transform: scale(1); opacity: 1;} }
+        @keyframes popIn { 0% { transform: scale(0.5) rotate(-15deg); opacity: 0; } 80% { transform: scale(1.1) rotate(-5deg); opacity: 1; } 100% { transform: scale(1) rotate(-5deg); opacity: 1; } }
+        @keyframes shake { 0%, 100% {transform: translateX(0);} 25% {transform: translateX(-5px);} 75% {transform: translateX(5px);} }
+        
+        .animate-\[fadeIn_0\.5s_ease-out\] { animation: fadeIn 0.5s ease-out forwards; }
+        .animate-\[slideInRight_0\.3s_ease-out\] { animation: slideInRight 0.3s ease-out forwards; }
+        .animate-\[slideInLeft_0\.2s_ease-out\] { animation: slideInLeft 0.2s ease-out forwards; }
+        .animate-\[slideInDown_0\.3s_ease-out\] { animation: slideInDown 0.3s ease-out forwards; }
+        .animate-\[slideInDown_0\.4s_ease-out\] { animation: slideInDown 0.4s ease-out forwards; }
+        .animate-\[pop_0\.2s_ease-out\] { animation: pop 0.2s ease-out forwards; }
+        .animate-\[popIn_0\.3s_ease-out\] { animation: popIn 0.3s ease-out forwards; }
+        .animate-\[shake_0\.5s_ease-in-out\] { animation: shake 0.5s ease-in-out forwards; }
+    </style>
+</head>
+<body class="bg-[#0a0a0a] text-white">
+
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // --- ICON HELPERS ---
+        const Icon = ({ name, size = 24, className = "" }) => (
+            <i className={`fa-solid fa-${name} ${className}`} style={{ fontSize: size }}></i>
+        );
+        const IconReg = ({ name, size = 24, className = "" }) => (
+            <i className={`fa-regular fa-${name} ${className}`} style={{ fontSize: size }}></i>
+        );
+
+        // --- CONSTANTS & ASSETS ---
+        const YOUTUBE_ID = "hmL6Z9rX8MU";
+        const BG_DINER = "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?q=80&w=1974&auto=format&fit=crop";
+        const BG_CAKE = "https://images.unsplash.com/photo-1578985545062-69928b1d9587?q=80&w=1989&auto=format&fit=crop";
+        const BG_COVER = "https://images.unsplash.com/photo-1514933651103-005eec06c04b?q=80&w=1934&auto=format&fit=crop"; 
+        const BG_FRIES = "https://images.unsplash.com/photo-1585692131976-92cda191c96b?q=80&w=1974&auto=format&fit=crop";
+
+        // --- REUSABLE UI COMPONENTS ---
+        const GlassCard = ({ children, className = "", onClick = null }) => (
+            <div 
+                onClick={onClick}
+                className={`bg-[#141414]/90 backdrop-blur-xl border border-white/10 rounded-2xl p-6 shadow-2xl ${onClick ? 'cursor-pointer hover:bg-white/10 hover:border-white/30 transition-all active:scale-95' : ''} ${className}`}
+            >
+                {children}
+            </div>
+        );
+
+        const Button = ({ onClick, children, primary, disabled, className = "", variant = "default", title }) => {
+            const baseStyle = "font-bold rounded-xl px-6 py-3 transition-all duration-300 transform flex items-center justify-center gap-2";
+            
+            let colorStyle = "";
+            if (variant === "netflix-white") {
+                colorStyle = "bg-white hover:bg-gray-200 text-black";
+            } else if (variant === "netflix-dark") {
+                colorStyle = "bg-[#2b2b2b] hover:bg-[#3b3b3b] text-white border border-white/10";
+            } else if (primary) {
+                colorStyle = "bg-[#e50914] hover:bg-[#b80710] text-white shadow-[0_0_20px_rgba(229,9,20,0.4)]";
+            } else {
+                colorStyle = "bg-white/10 hover:bg-white/20 text-white border border-white/20";
+            }
+
+            const disabledStyle = disabled ? "opacity-30 cursor-not-allowed" : "hover:scale-105 active:scale-95 cursor-pointer";
+            
+            return (
+                <button onClick={onClick} disabled={disabled} title={title} className={`${baseStyle} ${colorStyle} ${disabledStyle} ${className}`}>
+                {children}
+                </button>
+            );
+        };
+
+        // ==========================================
+        // 🛠️ TEACHER TOOLSET
+        // ==========================================
+        const TeacherTools = ({ addXp }) => {
+            const [isOpen, setIsOpen] = useState(false);
+            const [whiteboardOpen, setWhiteboardOpen] = useState(false);
+            const [timerSeconds, setTimerSeconds] = useState(0);
+            const [showPraise, setShowPraise] = useState(false);
+            const timerRef = useRef(null);
+
+            useEffect(() => {
+                if (timerSeconds > 0) {
+                timerRef.current = setTimeout(() => setTimerSeconds(t => t - 1), 1000);
+                }
+                return () => clearTimeout(timerRef.current);
+            }, [timerSeconds]);
+
+            const triggerPraise = () => {
+                addXp(50);
+                setShowPraise(true);
+                setTimeout(() => setShowPraise(false), 2500);
+            };
+
+            return (
+                <React.Fragment>
+                {showPraise && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none animate-[popIn_0.3s_ease-out]">
+                    <div className="bg-gradient-to-r from-emerald-400 to-emerald-600 text-white font-black text-6xl md:text-8xl px-12 py-8 rounded-3xl shadow-[0_0_100px_rgba(16,185,129,0.8)] border-4 border-white transform rotate-[-5deg] tracking-tighter uppercase">
+                        BRILLIANT! <br/><span className="text-4xl text-emerald-200 block text-center mt-2">+50 XP</span>
+                    </div>
+                    </div>
+                )}
+
+                {timerSeconds > 0 && (
+                    <div className="fixed top-6 left-1/2 transform -translate-x-1/2 z-50 bg-[#e50914] text-white font-mono font-black text-4xl px-8 py-3 rounded-full shadow-[0_0_30px_rgba(229,9,20,0.6)] animate-pulse">
+                    00:{timerSeconds.toString().padStart(2, '0')}
+                    </div>
+                )}
+
+                <div className="fixed top-6 left-6 z-[60] flex items-center gap-3">
+                    <button 
+                    onClick={() => setIsOpen(!isOpen)}
+                    className={`w-14 h-14 rounded-full flex items-center justify-center transition-all shadow-2xl z-20 ${isOpen ? 'bg-[#b80710]' : 'bg-[#e50914] hover:scale-105'}`}
+                    >
+                    {isOpen ? <Icon name="xmark" size={28} className="text-white" /> : <Icon name="pen-to-square" size={28} className="text-white" />}
+                    </button>
+
+                    {isOpen && (
+                    <div className="flex gap-3 bg-[#1a1a1a]/95 backdrop-blur-md p-2.5 rounded-2xl border border-white/10 shadow-2xl animate-[slideInLeft_0.2s_ease-out] z-10 pl-6 -ml-4">
+                        <button onClick={() => setWhiteboardOpen(!whiteboardOpen)} className="w-12 h-12 bg-[#2a2a2a] rounded-xl flex items-center justify-center hover:bg-[#333] transition-colors group" title="Whiteboard">
+                        <Icon name="pen-to-square" size={24} className="text-[#3b82f6] group-hover:scale-110 transition-transform" />
+                        </button>
+                        <button onClick={() => setTimerSeconds(60)} className="w-12 h-12 bg-[#2a2a2a] rounded-xl flex items-center justify-center hover:bg-[#333] transition-colors group" title="60s Timer">
+                        <Icon name="stopwatch" size={24} className="text-[#eab308] group-hover:scale-110 transition-transform" />
+                        </button>
+                        <button onClick={triggerPraise} className="w-12 h-12 bg-[#2a2a2a] rounded-xl flex items-center justify-center hover:bg-[#333] transition-colors group" title="Give Praise (+50 XP)">
+                        <Icon name="thumbs-up" size={24} className="text-[#10b981] group-hover:scale-110 transition-transform" />
+                        </button>
+                    </div>
+                    )}
+                </div>
+
+                {whiteboardOpen && (
+                    <div className="fixed right-0 top-0 h-full w-[400px] bg-[#0a0a0a]/95 backdrop-blur-2xl border-l border-white/10 z-[70] p-6 shadow-2xl animate-[slideInRight_0.3s_ease-out] flex flex-col">
+                    <div className="flex justify-between items-center mb-6">
+                        <h3 className="text-white font-bold text-xl flex items-center gap-2"><Icon name="pen-to-square" size={18} className="text-blue-500"/> Teacher Notes</h3>
+                        <button onClick={() => setWhiteboardOpen(false)} className="text-gray-400 hover:text-white"><Icon name="xmark" size={24}/></button>
+                    </div>
+                    <textarea 
+                        className="flex-1 bg-white/5 border border-white/10 rounded-xl p-4 text-white text-lg font-mono focus:outline-none focus:border-blue-500 resize-none custom-scrollbar"
+                        placeholder="Type live notes, examples, or vocabulary here..."
+                    ></textarea>
+                    </div>
+                )}
+            </React.Fragment>
+            );
+        };
+
+        // ==========================================
+        // 🚀 SLIDE TEMPLATES
+        // ==========================================
+
+        const TeacherGuideSlide = ({ startLesson, toggleFs, isFs }) => (
+            <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center p-8 relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-600 to-red-900"></div>
+                <div className="max-w-6xl w-full z-10 grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div className="lg:col-span-2 space-y-6">
+                    <div className="flex items-center gap-4 mb-8">
+                    <div className="bg-red-600/20 p-4 rounded-2xl border border-red-500/50"><Icon name="triangle-exclamation" size={40} className="text-red-500" /></div>
+                    <div>
+                        <h1 className="text-4xl font-black text-white uppercase tracking-tight">Teacher's Lounge</h1>
+                        <p className="text-red-400 font-bold tracking-widest text-sm uppercase mt-1">Classified Lesson Protocol v12.1</p>
+                    </div>
+                    </div>
+                    <GlassCard className="border-white/5">
+                    <h2 className="text-2xl font-bold text-white mb-4 flex items-center gap-2"><Icon name="crosshairs" className="text-red-500"/> Lesson Objective</h2>
+                    <p className="text-gray-300 text-lg leading-relaxed">
+                        This is a 60-minute immersive cinematic experience. Features include the <strong>Pre-Watch Vocabulary</strong>, the <strong>Spotify-Style Script</strong>, and the new <strong>Integrated Shadowing Studio</strong> with safe Fullscreen handling.
+                    </p>
+                    </GlassCard>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <GlassCard className="border-white/5 border-t-4 border-t-blue-500">
+                        <h3 className="text-lg font-bold text-white mb-2">Global Fullscreen</h3>
+                        <p className="text-gray-400">Use the floating expand icon in the top right corner to instantly make the lesson full screen at any point.</p>
+                    </GlassCard>
+                    <GlassCard className="border-white/5 border-t-4 border-t-emerald-500">
+                        <h3 className="text-lg font-bold text-white mb-2">Secret HUD</h3>
+                        <p className="text-gray-400">Click the <Icon name="eye" size={16} className="inline mb-1"/> icon at the top right to reveal hidden pedagogical tips on each slide.</p>
+                    </GlassCard>
+                    </div>
+                </div>
+                <div className="bg-[#141414] border border-white/10 rounded-3xl p-8 flex flex-col justify-center text-center shadow-2xl">
+                    <div className="w-24 h-24 bg-red-600/10 rounded-full flex items-center justify-center mx-auto mb-6 border border-red-500/30">
+                    <IconReg name="circle-play" size={48} className="text-red-500" />
+                    </div>
+                    <h3 className="text-3xl font-black text-white mb-2">Ready to broadcast?</h3>
+                    <p className="text-gray-400 mb-8">Share your screen, hide your bookmarks, and prepare for immersion.</p>
+                    <Button primary onClick={startLesson} className="w-full py-5 text-xl uppercase tracking-widest">Initiate Engine</Button>
+                </div>
+                </div>
+            </div>
+        );
+
+        const CoverSlide = ({ nextSlide }) => (
+            <div className="relative w-full h-full flex flex-col items-center justify-center text-center p-8 bg-[#0a0a0a]">
+                <div className="absolute inset-0 z-0 bg-cover bg-center opacity-40 mix-blend-luminosity mask-image-gradient" style={{ backgroundImage: `url(${BG_COVER})` }}></div>
+                <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0a] via-transparent to-transparent z-0"></div>
+                <div className="z-10 flex flex-col items-center mt-20 max-w-5xl">
+                <div className="flex items-center gap-3 mb-6">
+                    <div className="w-10 h-10 bg-[#e50914] text-white font-black text-2xl flex items-center justify-center shadow-lg">W</div>
+                    <span className="text-gray-300 font-bold tracking-[0.3em] text-sm uppercase">Interactive Experience</span>
+                </div>
+                <h1 className="text-7xl md:text-9xl font-black text-white mb-2 drop-shadow-2xl tracking-tighter uppercase" style={{fontFamily: "'Arial Black', Impact, sans-serif"}}>FRIENDS</h1>
+                <h2 className="text-3xl md:text-5xl text-[#e50914] font-black italic mb-10 tracking-wide uppercase">Joey Doesn't Share Food</h2>
+                <div className="flex flex-wrap items-center justify-center gap-4 text-sm font-bold mb-12">
+                    <span className="text-green-500 text-lg">98% Match</span>
+                    <span className="bg-white/10 border border-white/20 text-white px-3 py-1 rounded-md">B1 INTERMEDIATE</span>
+                    <span className="flex items-center gap-1 text-white"><Icon name="wand-magic-sparkles" size={16}/> Immersive</span>
+                    <span className="bg-transparent border border-white/30 text-gray-300 px-3 py-1 rounded-md">4K</span>
+                </div>
+                <div className="flex flex-wrap items-center justify-center gap-4 text-white font-black tracking-widest text-sm md:text-base mb-12 uppercase">
+                    <span>PAST CONTINUOUS</span><div className="w-2 h-2 rounded-full bg-[#e50914]"></div>
+                    <span>INTERRUPTIONS</span><div className="w-2 h-2 rounded-full bg-[#e50914]"></div>
+                    <span>FOOD VOCABULARY</span>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-4 w-full justify-center max-w-xl">
+                    <Button variant="netflix-white" onClick={nextSlide} className="flex-1 py-4 text-lg uppercase"><Icon name="play" size={24} /> Watch Lesson</Button>
+                    <Button variant="netflix-dark" className="flex-1 py-4 text-lg uppercase"><Icon name="plus" size={24} /> My Homework</Button>
+                </div>
+                </div>
+            </div>
+        );
+
+        const VocabFocusSlide = ({ word, emoji, definition, followUp, starters }) => {
+            const [revealed, setRevealed] = useState(false);
+            return (
+                <div className="flex flex-col items-center justify-center h-full w-full max-w-5xl mx-auto p-8 animate-[fadeIn_0.5s_ease-out] relative z-10">
+                <div className="bg-[#e50914]/20 text-[#e50914] border border-[#e50914]/30 px-4 py-1 rounded-full text-sm font-bold tracking-widest mb-8 flex items-center gap-2 uppercase shadow-lg">
+                    <Icon name="book-open" size={16}/> Key Vocabulary
+                </div>
+                <div className="w-full bg-[#141414]/90 backdrop-blur-2xl border border-white/10 rounded-3xl p-12 text-center shadow-[0_20px_50px_rgba(0,0,0,0.5)] mb-8 transform transition-all duration-700">
+                    <div className="text-8xl mb-6">{emoji}</div>
+                    <h2 className="text-6xl md:text-7xl font-black text-white mb-4 uppercase tracking-tighter" style={{fontFamily: "'Arial Black', Impact, sans-serif"}}>{word}</h2>
+                    <p className="text-2xl text-gray-400 font-medium max-w-2xl mx-auto">{definition}</p>
+                </div>
+                {!revealed ? (
+                    <Button variant="netflix-white" onClick={() => setRevealed(true)} className="px-10 py-4 text-xl uppercase tracking-wider shadow-2xl">
+                    <IconReg name="comment-dots" size={24} /> Reveal Discussion
+                    </Button>
+                ) : (
+                    <div className="w-full bg-gradient-to-br from-[#1a1a1a] to-[#0a0a0a] border border-white/10 rounded-3xl p-8 text-center animate-[slideInDown_0.4s_ease-out] shadow-2xl">
+                    <p className="text-gray-500 font-bold uppercase tracking-widest text-sm mb-4">Speak Up</p>
+                    <p className="text-3xl text-white font-medium mb-8">"{followUp}"</p>
+                    {starters && (
+                        <div className="flex flex-wrap justify-center gap-4">
+                        {starters.map((starter, i) => (
+                            <button key={i} className="px-6 py-3 bg-[#2b2b2b] hover:bg-[#e50914] hover:scale-105 transition-all duration-300 border border-white/5 rounded-full text-white font-bold text-lg shadow-lg">
+                            {starter}
+                            </button>
+                        ))}
+                        </div>
+                    )}
+                    </div>
+                )}
+                </div>
+            );
+        };
+
+        const DiscussionSlide = ({ question, hint }) => (
+            <div className="flex flex-col items-center justify-center h-full w-full max-w-5xl mx-auto p-8 animate-[fadeIn_0.5s_ease-out] text-center">
+                <div className="bg-emerald-600/20 text-emerald-400 px-4 py-1 rounded-full text-sm font-bold tracking-widest mb-8 flex items-center gap-2 uppercase">
+                <IconReg name="comment-dots" size={16}/> Let's Talk
+                </div>
+                <h2 className="text-5xl md:text-6xl font-black mb-12 text-white leading-tight uppercase tracking-tight">{question}</h2>
+                <GlassCard className="border-emerald-500/30 bg-emerald-900/10 inline-block px-12 py-6">
+                <p className="text-emerald-400 font-bold uppercase tracking-widest text-sm mb-2">Speak Up</p>
+                <p className="text-2xl text-gray-300 font-medium">{hint}</p>
+                </GlassCard>
+            </div>
+        );
+
+        const DilemmaSlide = ({ title = "The Dilemma", question, options, bgImage, onWin }) => {
+            const [selected, setSelected] = useState(null);
+            return (
+                <div className="flex flex-col items-center justify-center h-full w-full max-w-6xl mx-auto p-8 animate-[fadeIn_0.5s_ease-out] relative">
+                <div className="absolute inset-0 z-0 bg-cover bg-center opacity-30 mix-blend-luminosity rounded-3xl overflow-hidden" style={{ backgroundImage: `url(${bgImage})` }}></div>
+                <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0a] via-[#0a0a0a]/80 to-transparent z-0"></div>
+                <div className="z-10 w-full text-center">
+                    <h2 className="text-5xl md:text-7xl font-black mb-4 text-white uppercase tracking-tighter" style={{fontFamily: "'Arial Black', Impact, sans-serif"}}>{title}</h2>
+                    <p className="text-2xl text-gray-300 mb-10 font-medium">{question}</p>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-5xl mx-auto mb-10">
+                    {options.map((opt, i) => (
+                        <div 
+                        key={i}
+                        onClick={() => { setSelected(i); onWin(100); }}
+                        className={`relative overflow-hidden cursor-pointer rounded-2xl border-2 transition-all duration-500 aspect-video flex flex-col justify-end p-6 text-left group
+                            ${selected === i ? 'border-[#e50914] scale-105 shadow-[0_0_30px_rgba(229,9,20,0.4)]' : 'border-white/10 hover:border-white/40 hover:scale-105 bg-[#141414]/80 backdrop-blur-md'}`}
+                        >
+                        <div className={`absolute inset-0 bg-gradient-to-t transition-opacity ${selected === i ? 'from-[#e50914]/80 to-transparent' : 'from-black/80 to-transparent opacity-0 group-hover:opacity-100'}`}></div>
+                        <div className="relative z-10">
+                            {selected === i && <IconReg name="circle-check" size={32} className="text-white mb-2" />}
+                            <h3 className="text-3xl font-black text-white mb-1 uppercase tracking-tight">{opt.text}</h3>
+                            <p className="text-gray-300 font-medium">{opt.sub}</p>
+                        </div>
+                        </div>
+                    ))}
+                    </div>
+                    <div className="bg-transparent mt-4 inline-block mx-auto text-center w-full">
+                    <p className="text-gray-500 uppercase tracking-widest text-xs font-bold mb-4"><IconReg name="comment-dots" size={16} className="inline mr-1"/> Speaking Starters</p>
+                    <div className="flex flex-wrap justify-center gap-4">
+                        <button className="px-6 py-3 bg-[#141414] hover:bg-white hover:text-black border border-white/20 rounded-full font-bold transition-all shadow-lg text-gray-300">"If I were in this situation..."</button>
+                        <button className="px-6 py-3 bg-[#141414] hover:bg-white hover:text-black border border-white/20 rounded-full font-bold transition-all shadow-lg text-gray-300">"I strongly believe that..."</button>
+                        <button className="px-6 py-3 bg-[#141414] hover:bg-white hover:text-black border border-white/20 rounded-full font-bold transition-all shadow-lg text-gray-300">"To be honest, I'd..."</button>
+                    </div>
+                    </div>
+                </div>
+                </div>
+            );
+        };
+
+        const VideoSlide = ({ title, start, end, mission }) => {
+            const containerRef = useRef(null);
+            const [isFullscreen, setIsFullscreen] = useState(false);
+
+            useEffect(() => {
+                const onChange = () => setIsFullscreen(!!document.fullscreenElement);
+                document.addEventListener('fullscreenchange', onChange);
+                return () => document.removeEventListener('fullscreenchange', onChange);
+            }, []);
+
+            const toggleFs = async () => {
+                try {
+                    if(!document.fullscreenElement && !isFullscreen) {
+                        if (containerRef.current?.requestFullscreen) {
+                            await containerRef.current.requestFullscreen();
+                        } else {
+                            setIsFullscreen(true);
+                        }
+                    } else {
+                        if (document.exitFullscreen && document.fullscreenElement) {
+                            await document.exitFullscreen();
+                        } else {
+                            setIsFullscreen(false);
+                        }
+                    }
+                } catch(e) {
+                    console.warn("Fullscreen permission denied. Using CSS fallback.", e);
+                    setIsFullscreen(!isFullscreen);
+                }
+            };
+
+            return (
+                <div className="flex flex-col items-center justify-center h-full w-full max-w-5xl mx-auto p-8 animate-[fadeIn_0.5s_ease-out]">
+                    <div className="w-full flex justify-between items-end mb-4">
+                        <h2 className="text-3xl font-black text-white uppercase tracking-tight">{title}</h2>
+                        {mission && (
+                            <div className="bg-red-600/20 border border-[#e50914] text-red-100 px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 animate-pulse uppercase tracking-wide">
+                            <Icon name="circle-exclamation" size={16} className="text-[#e50914]"/> MISSION: {mission}
+                            </div>
+                        )}
+                    </div>
+                    <div ref={containerRef} className={`w-full bg-black overflow-hidden shadow-2xl border relative group transition-all duration-300 
+                        ${isFullscreen && !document.fullscreenElement ? 'fixed inset-0 z-[9999] rounded-none border-none flex items-center justify-center' : 'rounded-2xl border-white/10 aspect-video'}`}>
+                        <iframe className={`absolute ${isFullscreen && !document.fullscreenElement ? 'w-full h-full max-w-[177vh]' : 'w-full h-full'}`} src={`https://www.youtube.com/embed/${YOUTUBE_ID}?start=${start}${end ? '&end='+end : ''}&rel=0&modestbranding=1&showinfo=0`} frameBorder="0" allow="autoplay; encrypted-media" allowFullScreen></iframe>
+                        <button onClick={toggleFs} className="absolute top-4 right-4 bg-black/80 hover:bg-[#e50914] text-white px-4 py-2 rounded-xl transition-all z-10 flex items-center gap-2 backdrop-blur-md border border-white/20 shadow-2xl">
+                            <Icon name={isFullscreen ? "compress" : "expand"} size={16} />
+                            <span className="font-bold uppercase tracking-widest text-xs hidden sm:block">{isFullscreen ? "Exit" : "Fullscreen"}</span>
+                        </button>
+                    </div>
+                </div>
+            );
+        };
+
+        const SpotifyScriptSlide = ({ title, scriptLines }) => {
+            const [activeIndex, setActiveIndex] = useState(null);
+            return (
+                <div className="flex flex-col md:flex-row h-full w-full max-w-7xl mx-auto p-8 gap-12 animate-[fadeIn_0.5s_ease-out] items-center relative">
+                <div className="absolute inset-0 bg-[#0a0a0a]/90 backdrop-blur-2xl z-0 rounded-3xl shadow-2xl"></div>
+                <div className="flex-1 w-full h-full flex flex-col justify-center relative z-10 overflow-hidden pl-8">
+                    <div className="mb-8">
+                    <h2 className="text-4xl font-black text-white uppercase tracking-tight mb-2">{title}</h2>
+                    <p className="text-gray-400 flex items-center gap-2"><Icon name="book-open" size={18}/> Tap a script line to reveal its secrets.</p>
+                    </div>
+                    <div className="space-y-6 max-h-[60vh] overflow-y-auto pr-4 custom-scrollbar pb-20">
+                    {scriptLines.map((line, idx) => (
+                        <div 
+                        key={idx}
+                        onClick={() => setActiveIndex(idx)}
+                        className={`cursor-pointer transition-all duration-300 transform 
+                            ${activeIndex === idx 
+                            ? 'text-white text-4xl md:text-5xl font-black scale-100' 
+                            : 'text-gray-600 hover:text-gray-400 text-3xl md:text-4xl font-bold scale-95 origin-left'
+                            }`}
+                        >
+                        {line.text}
+                        </div>
+                    ))}
+                    </div>
+                </div>
+
+                <div className="w-full md:w-[450px] transition-all duration-500 z-10 pr-8">
+                    {activeIndex !== null ? (
+                    <div className="bg-[#1e1e1e] border border-white/10 rounded-[2rem] p-6 animate-[slideInRight_0.3s_ease-out] h-full flex flex-col justify-center shadow-2xl">
+                        <div className="flex flex-col items-center mb-6 text-center">
+                        <span className="bg-[#3b82f6] text-white text-xs font-bold px-3 py-1.5 rounded-md uppercase tracking-wider mb-4 shadow-md">Target Focus</span>
+                        <h3 className="text-4xl font-black text-white capitalize leading-tight">{scriptLines[activeIndex].focus.word}</h3>
+                        </div>
+                        <div className="bg-[#141414] rounded-xl p-5 mb-4 shadow-inner">
+                        <p className="text-[#3b82f6] text-xs font-bold uppercase tracking-widest mb-2 flex items-center gap-2">
+                            <Icon name="circle-info" size={14}/> Meaning / Rule
+                        </p>
+                        <p className="text-white text-lg font-medium">{scriptLines[activeIndex].focus.meaning}</p>
+                        </div>
+                        {scriptLines[activeIndex].focus.grammarNote && (
+                        <div className="bg-[#152a24] border-l-4 border-[#10b981] p-5 rounded-r-xl mb-4 shadow-inner">
+                            <p className="text-[#10b981] text-xs font-bold uppercase tracking-widest mb-2">Grammar Check</p>
+                            <p className="text-white text-md font-medium">{scriptLines[activeIndex].focus.grammarNote}</p>
+                        </div>
+                        )}
+                        {scriptLines[activeIndex].focus.followUp && (
+                        <div className="bg-[#2a1b38] border-l-4 border-[#a855f7] p-5 rounded-r-xl shadow-inner mt-auto">
+                            <p className="text-[#a855f7] text-xs font-bold uppercase tracking-widest mb-2 flex items-center gap-2">
+                            <IconReg name="comment-dots" size={14}/> Follow-Up Question
+                            </p>
+                            <p className="text-white text-md font-bold italic">"{scriptLines[activeIndex].focus.followUp}"</p>
+                        </div>
+                        )}
+                    </div>
+                    ) : (
+                    <div className="h-[450px] border-2 border-dashed border-white/10 rounded-[2rem] flex flex-col items-center justify-center text-gray-500 p-8 text-center bg-[#1e1e1e]/50">
+                        <Icon name="magnifying-glass" size={48} className="mb-4 opacity-30" />
+                        <p className="text-lg font-medium">Select a script line to open the deep analysis.</p>
+                    </div>
+                    )}
+                </div>
+                </div>
+            );
+        };
+
+        const GrammarSlide = () => {
+            const [mode, setMode] = useState('background'); 
+            return (
+                <div className="flex flex-col items-center justify-center h-full p-8 w-full max-w-6xl mx-auto animate-[fadeIn_0.5s_ease-out]">
+                <div className="bg-blue-600/20 text-blue-400 px-4 py-1 rounded-full text-sm font-bold tracking-widest mb-6 flex items-center gap-2 uppercase border border-blue-500/30 shadow-lg">
+                    <Icon name="crosshairs" size={16}/> Grammar Detective
+                </div>
+                <h2 className="text-5xl md:text-6xl font-black mb-12 text-white uppercase tracking-tight">The Timeline Rule</h2>
+
+                <div className="flex flex-col md:flex-row w-full gap-8">
+                    <div className="flex-1 flex flex-col gap-4">
+                    <button onClick={() => setMode('background')} className={`p-6 rounded-3xl border-2 transition-all duration-300 text-left flex flex-col gap-2 group ${mode === 'background' ? 'bg-blue-900/40 border-blue-500 shadow-[0_0_40px_rgba(59,130,246,0.2)]' : 'bg-[#141414] border-white/5 hover:border-white/20 hover:bg-[#1a1a1a]'}`}>
+                        <span className="text-blue-400 font-bold uppercase tracking-widest text-xs">Step 1</span>
+                        <span className="text-2xl font-black text-white uppercase tracking-tight group-hover:translate-x-2 transition-transform">Background Action</span>
+                        <span className="text-gray-400 font-medium">The long action that was already happening.</span>
+                    </button>
+                    <button onClick={() => setMode('interruption')} className={`p-6 rounded-3xl border-2 transition-all duration-300 text-left flex flex-col gap-2 group ${mode === 'interruption' ? 'bg-red-900/40 border-[#e50914] shadow-[0_0_40px_rgba(229,9,20,0.2)]' : 'bg-[#141414] border-white/5 hover:border-white/20 hover:bg-[#1a1a1a]'}`}>
+                        <span className="text-[#e50914] font-bold uppercase tracking-widest text-xs">Step 2</span>
+                        <span className="text-2xl font-black text-white uppercase tracking-tight group-hover:translate-x-2 transition-transform">Sudden Interruption</span>
+                        <span className="text-gray-400 font-medium">The short action that breaks the moment.</span>
+                    </button>
+                    </div>
+
+                    <div className="flex-[1.5] relative">
+                    <GlassCard className="h-full flex flex-col justify-center border-white/10 bg-[#141414]/90 p-10 shadow-2xl">
+                        {mode === 'background' ? (
+                        <div className="animate-[slideInRight_0.3s_ease-out]">
+                            <div className="flex items-center gap-4 mb-8">
+                            <div className="h-2 flex-1 bg-blue-500 rounded-full animate-pulse shadow-[0_0_15px_rgba(59,130,246,0.8)]"></div>
+                            <span className="text-blue-500 font-black text-xl tracking-widest">PAST CONTINUOUS</span>
+                            </div>
+                            <h3 className="text-4xl md:text-5xl font-black text-white leading-tight mb-8">
+                            "We <span className="text-blue-400">WERE HAVING</span> dinner..."
+                            </h3>
+                            <div className="bg-blue-950/30 border-l-4 border-blue-500 p-6 rounded-r-2xl">
+                            <p className="text-gray-300 text-lg leading-relaxed">Use <strong>WAS / WERE + VERB(ing)</strong> to set the scene. This action started before the interruption and was ongoing.</p>
+                            </div>
+                        </div>
+                        ) : (
+                        <div className="animate-[slideInRight_0.3s_ease-out]">
+                            <div className="flex items-center gap-4 mb-8 relative">
+                            <div className="h-2 flex-1 bg-blue-500/30 rounded-full"></div>
+                            <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 w-3 h-16 bg-[#e50914] rotate-12 shadow-[0_0_20px_rgba(229,9,20,0.8)] rounded-full"></div>
+                            <span className="text-[#e50914] font-black text-xl tracking-widest">PAST SIMPLE</span>
+                            </div>
+                            <h3 className="text-4xl md:text-5xl font-black text-white leading-tight mb-8">
+                            "...and then she <span className="text-[#e50914]">TOOK</span> my fries."
+                            </h3>
+                            <div className="bg-red-950/30 border-l-4 border-[#e50914] p-6 rounded-r-2xl">
+                            <p className="text-gray-300 text-lg leading-relaxed">Use the <strong>Past Simple (V2)</strong> for the sudden event that stops or interrupts the background action.</p>
+                            </div>
+                        </div>
+                        )}
+                    </GlassCard>
+                    </div>
+                </div>
+            </div>
+            );
+        };
+
+        const QuizSlide = ({ question, options, answerIndex, explanation, followUp, onWin }) => {
+            const [selected, setSelected] = useState(null);
+            const isCorrect = selected === answerIndex;
+
+            const handleSelect = (idx) => {
+                if (selected !== null && isCorrect) return; 
+                setSelected(idx);
+                if (idx === answerIndex) onWin(150);
+                else setTimeout(() => setSelected(null), 1000);
+            };
+
+            return (
+                <div className="flex flex-col items-center justify-center h-full w-full max-w-5xl mx-auto p-8 text-center animate-[fadeIn_0.5s_ease-out] relative">
+                <div className="bg-orange-500/20 text-orange-400 px-4 py-1 rounded-full text-sm font-bold tracking-widest mb-6 flex items-center gap-2 uppercase">
+                    <Icon name="gamepad" size={16}/> Knowledge Check
+                </div>
+                <h2 className="text-4xl md:text-5xl font-black text-white mb-10 uppercase tracking-tight leading-tight">{question}</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-4xl transition-all duration-500">
+                    {options.map((opt, i) => {
+                    let stateClass = "bg-[#2b2b2b] border-white/5 hover:bg-[#3b3b3b]";
+                    if (selected !== null) {
+                        if (i === answerIndex) stateClass = "bg-green-600 border-green-500";
+                        else if (selected === i) stateClass = "bg-red-600 border-red-500 animate-[shake_0.5s_ease-in-out]";
+                        else stateClass = "opacity-50";
+                    }
+                    return (
+                        <button 
+                        key={i} disabled={selected !== null && isCorrect} onClick={() => handleSelect(i)}
+                        className={`py-8 px-6 rounded-2xl border-2 font-bold text-2xl transition-all duration-300 text-white flex items-center justify-center ${stateClass}`}
+                        >
+                        {selected === i && i === answerIndex && <Icon name="check" size={24} className="mr-2" />}
+                        {selected === i && i !== answerIndex && <Icon name="xmark" size={24} className="mr-2" />}
+                        {opt}
+                        </button>
+                    )
+                    })}
+                </div>
+                {isCorrect && explanation && (
+                    <div className="w-full max-w-4xl mt-8 bg-gradient-to-br from-[#1a1a1a] to-[#0a0a0a] border border-green-500/30 rounded-3xl p-8 text-left animate-[slideInDown_0.4s_ease-out] shadow-[0_10px_40px_rgba(22,163,74,0.15)]">
+                    <div className="flex flex-col md:flex-row gap-8 items-start">
+                        <div className="flex-1">
+                            <p className="text-green-400 font-bold uppercase tracking-widest text-xs mb-3 flex items-center gap-2"><IconReg name="circle-check" size={14}/> Why is this correct?</p>
+                            <p className="text-gray-200 text-lg leading-relaxed">{explanation}</p>
+                        </div>
+                        <div className="w-px h-full bg-white/10 hidden md:block min-h-[100px]"></div>
+                        <div className="h-px w-full bg-white/10 md:hidden"></div>
+                        <div className="flex-1">
+                            <p className="text-[#a855f7] font-bold uppercase tracking-widest text-xs mb-3 flex items-center gap-2"><IconReg name="comment-dots" size={14}/> Discussion</p>
+                            <p className="text-white text-2xl font-bold italic leading-tight">"{followUp}"</p>
+                        </div>
+                    </div>
+                    </div>
+                )}
+                </div>
+            );
+        };
+
+        const BuilderSlide = ({ words, onWin }) => {
+            const [available, setAvailable] = useState([...words].sort(() => Math.random() - 0.5));
+            const [built, setBuilt] = useState([]);
+            const [status, setStatus] = useState('playing'); 
+
+            const handleAdd = (w, originalIndex) => {
+                if(status !== 'playing') return;
+                const newBuilt = [...built, { word: w, id: Math.random() }]; 
+                setBuilt(newBuilt);
+                setAvailable(available.filter((_, i) => i !== originalIndex));
+
+                if (newBuilt.length === words.length) {
+                const builtSentence = newBuilt.map(item => item.word).join(" ");
+                const correctSentence = words.join(" ");
+                if (builtSentence === correctSentence) {
+                    setStatus('won');
+                    onWin(200);
+                } else {
+                    setStatus('lost');
+                    setTimeout(() => {
+                    setAvailable([...words].sort(() => Math.random() - 0.5));
+                    setBuilt([]);
+                    setStatus('playing');
+                    }, 1500);
+                }
+                }
+            };
+
+            const handleRemove = (itemToRemove, indexInBuilt) => {
+                if (status !== 'playing') return;
+                const newBuilt = built.filter((_, i) => i !== indexInBuilt);
+                setBuilt(newBuilt);
+                setAvailable([...available, itemToRemove.word]);
+            };
+
+            return (
+                <div className="flex flex-col items-center justify-center h-full w-full max-w-6xl mx-auto p-8 text-center animate-[fadeIn_0.5s_ease-out] relative">
+                <div className="absolute inset-0 z-0 bg-cover bg-center opacity-20 mix-blend-luminosity rounded-3xl overflow-hidden" style={{ backgroundImage: `url(${BG_DINER})` }}></div>
+                <div className="absolute inset-0 bg-[#0a0a0a]/80 z-0"></div>
+
+                <div className="relative z-10 w-full flex flex-col items-center">
+                    <div className="text-cyan-400 font-bold tracking-widest mb-4 flex items-center gap-2 uppercase">
+                    <Icon name="bolt" size={16}/> Syntax Protocol
+                    </div>
+                    <h2 className="text-5xl md:text-7xl font-black text-white mb-12 uppercase tracking-tighter" style={{fontFamily: "'Arial Black', Impact, sans-serif"}}>
+                    Rebuild the Memory
+                    </h2>
+                    
+                    <div className={`min-h-[160px] w-full max-w-5xl bg-[#141414]/80 border-2 border-dashed rounded-3xl mb-12 flex items-center justify-center gap-4 p-8 flex-wrap transition-all duration-500 shadow-[0_0_30px_rgba(229,9,20,0.3)]
+                    ${status === 'won' ? 'border-green-500 bg-green-900/20 shadow-[0_0_50px_rgba(34,197,94,0.3)]' : status === 'lost' ? 'border-[#e50914] bg-red-900/20 shadow-[0_0_50px_rgba(229,9,20,0.5)]' : 'border-white/10'}`}>
+                    {built.map((item, i) => (
+                        <div 
+                        key={item.id} onClick={() => handleRemove(item, i)}
+                        className="bg-white text-black px-8 py-4 rounded-xl font-black text-2xl md:text-3xl shadow-xl animate-[pop_0.2s_ease-out] uppercase cursor-pointer hover:bg-red-100 hover:scale-105 transition-transform"
+                        title="Click to remove"
+                        >
+                        {item.word}
+                        </div>
+                    ))}
+                    {built.length === 0 && <span className="text-gray-500 text-2xl font-bold uppercase tracking-widest">Tap words below to build the sentence...</span>}
+                    </div>
+
+                    <div className="flex flex-wrap gap-4 justify-center max-w-4xl">
+                    {available.map((w, i) => (
+                        <button key={i} onClick={() => handleAdd(w, i)} className="bg-[#333] hover:bg-[#444] text-white px-8 py-4 rounded-xl font-bold text-2xl active:scale-95 transition-all hover:-translate-y-1 uppercase shadow-lg">
+                        {w}
+                        </button>
+                    ))}
+                    </div>
+                </div>
+                </div>
+            );
+        };
+
+        const DebateSlide = ({ title, question, vocabHints }) => (
+            <div className="flex flex-col items-center justify-center h-full w-full max-w-6xl mx-auto p-8 animate-[fadeIn_0.5s_ease-out]">
+                <div className="bg-red-600/20 text-[#e50914] px-4 py-1 rounded-full text-sm font-bold tracking-widest mb-6 flex items-center gap-2 uppercase border border-[#e50914]/30 shadow-lg">
+                <IconReg name="comment-dots" size={16}/> The Verdict
+                </div>
+                <h2 className="text-5xl md:text-7xl font-black mb-8 text-white uppercase tracking-tighter text-center" style={{fontFamily: "'Arial Black', Impact, sans-serif"}}>{title}</h2>
+                <p className="text-2xl text-gray-300 font-medium text-center mb-12 max-w-4xl">{question}</p>
+                <GlassCard className="w-full bg-[#141414]/90 border border-white/10 p-10 flex flex-col items-center shadow-2xl">
+                <p className="text-gray-500 uppercase tracking-widest text-sm font-bold mb-6 flex items-center gap-2"><Icon name="star" size={16} className="text-yellow-500"/> Challenge: Use these words in your answer</p>
+                <div className="flex flex-wrap justify-center gap-4">
+                    {vocabHints.map((hint, i) => (
+                    <span key={i} className="px-6 py-3 bg-[#2b2b2b] border border-white/5 rounded-xl text-white font-bold text-xl hover:border-[#e50914] hover:text-[#e50914] transition-all cursor-default shadow-lg">
+                        {hint}
+                    </span>
+                    ))}
+                </div>
+                </GlassCard>
+            </div>
+        );
+
+        const ShadowingIntroSlide = () => (
+            <div className="flex flex-col items-center justify-center h-full w-full max-w-6xl mx-auto p-8 animate-[fadeIn_0.5s_ease-out]">
+                <div className="bg-purple-600/20 text-purple-400 px-4 py-1 rounded-full text-sm font-bold tracking-widest mb-4 flex items-center gap-2 uppercase">
+                <Icon name="microphone" size={16}/> Fluency Protocol
+                </div>
+                <h2 className="text-6xl font-black mb-4 text-white text-center uppercase tracking-tight">The Shadowing Method</h2>
+                <p className="text-2xl text-gray-400 mb-16 text-center max-w-3xl">To speak like a native, you must practice muscle memory. Stop thinking. Start imitating.</p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full">
+                <GlassCard className="text-center py-12 border-t-4 border-t-blue-500 bg-[#141414]/90">
+                    <Icon name="headphones" size={56} className="mx-auto text-blue-400 mb-6" />
+                    <h3 className="text-3xl font-black text-white mb-4 uppercase">1. Listen</h3>
+                    <p className="text-gray-400 text-lg">Focus entirely on the rhythm, intonation, and connected speech.</p>
+                </GlassCard>
+                <GlassCard className="text-center py-12 border-t-4 border-t-yellow-500 bg-[#141414]/90">
+                    <IconReg name="comment-dots" size={56} className="mx-auto text-yellow-400 mb-6" />
+                    <h3 className="text-3xl font-black text-white mb-4 uppercase">2. Mumble</h3>
+                    <p className="text-gray-400 text-lg">Play the audio and whisper along. Match the exact speed.</p>
+                </GlassCard>
+                <GlassCard className="text-center py-12 border-t-4 border-t-purple-500 bg-purple-900/20">
+                    <Icon name="microphone" size={56} className="mx-auto text-purple-400 mb-6" />
+                    <h3 className="text-3xl font-black text-white mb-4 uppercase">3. Perform</h3>
+                    <p className="text-gray-400 text-lg">Speak out loud at the <strong>exact same time</strong> as the actor.</p>
+                </GlassCard>
+                </div>
+            </div>
+        );
+
+        const ShadowingStudioSlide = ({ title, phrase, connectedSpeech, start, end, onComplete }) => {
+            const [phase, setPhase] = useState(1);
+            const [isPerforming, setIsPerforming] = useState(false);
+            const containerRef = useRef(null);
+            const [isFullscreen, setIsFullscreen] = useState(false);
+
+            useEffect(() => {
+                const onChange = () => setIsFullscreen(!!document.fullscreenElement);
+                document.addEventListener('fullscreenchange', onChange);
+                return () => document.removeEventListener('fullscreenchange', onChange);
+            }, []);
+
+            const toggleFs = async () => {
+                try {
+                    if(!document.fullscreenElement && !isFullscreen) {
+                        if (containerRef.current?.requestFullscreen) {
+                            await containerRef.current.requestFullscreen();
+                        } else {
+                            setIsFullscreen(true);
+                        }
+                    } else {
+                        if (document.exitFullscreen && document.fullscreenElement) {
+                            await document.exitFullscreen();
+                        } else {
+                            setIsFullscreen(false);
+                        }
+                    }
+                } catch(e) {
+                    console.warn("Fullscreen permission denied. Using CSS fallback.", e);
+                    setIsFullscreen(!isFullscreen);
+                }
+            };
+
+            const handlePerform = () => {
+                setIsPerforming(true);
+                setTimeout(() => {
+                setIsPerforming(false);
+                setPhase(4); 
+                onComplete(300);
+                }, 4000); 
+            };
+
+            const loopUrl = `https://www.youtube.com/embed/${YOUTUBE_ID}?start=${start}&end=${end}&rel=0&modestbranding=1&showinfo=0&autoplay=1&loop=1&playlist=${YOUTUBE_ID}`;
+
+            return (
+                <div className="flex flex-col items-center justify-center h-full w-full max-w-7xl mx-auto p-8 animate-[fadeIn_0.5s_ease-out]">
+                <div className="bg-purple-600/20 text-purple-400 px-4 py-1 rounded-full text-sm font-bold tracking-widest mb-6 border border-purple-500/30 flex items-center gap-2 uppercase">
+                    <Icon name="microphone" size={16}/> Shadowing Studio
+                </div>
+                <h2 className="text-4xl md:text-5xl font-black text-white mb-8 uppercase tracking-tight">{title}</h2>
+                
+                <div className="flex flex-col md:flex-row w-full gap-8 items-stretch mb-8 h-full max-h-[500px]">
+                    <div ref={containerRef} className={`w-full md:w-1/2 bg-black overflow-hidden shadow-2xl border-2 border-white/10 relative group flex items-center justify-center transition-all duration-300 ${isFullscreen && !document.fullscreenElement ? 'fixed inset-0 z-[9999] w-full h-full md:w-full border-none rounded-none' : 'rounded-3xl'}`}>
+                        <div className="w-full aspect-video relative">
+                            <iframe className="absolute w-full h-full" src={loopUrl} frameBorder="0" allow="autoplay; encrypted-media" allowFullScreen></iframe>
+                        </div>
+                        <button onClick={toggleFs} className="absolute top-4 right-4 bg-black/80 hover:bg-[#e50914] text-white px-4 py-2 rounded-xl transition-all z-10 flex items-center gap-2 backdrop-blur-md border border-white/20 shadow-2xl">
+                            <Icon name={isFullscreen ? "compress" : "expand"} size={16} />
+                            <span className="font-bold uppercase tracking-widest text-xs hidden sm:block">{isFullscreen ? "Exit" : "Fullscreen"}</span>
+                        </button>
+                    </div>
+
+                    <div className="w-full md:w-1/2 flex flex-col justify-center">
+                        <GlassCard className={`w-full text-center py-12 mb-6 transition-all duration-500 border-2 flex flex-col justify-center h-full ${isPerforming ? 'border-purple-500 shadow-[0_0_50px_rgba(168,85,247,0.4)] scale-[1.02]' : 'border-white/5'}`}>
+                            <h3 className={`text-4xl md:text-5xl font-black mb-6 uppercase tracking-tighter transition-colors ${isPerforming ? 'text-white' : 'text-gray-300'}`}>"{phrase}"</h3>
+                            <p className="text-xl text-purple-400 font-mono bg-[#0a0a0a] inline-block px-6 py-3 rounded-2xl border border-purple-500/30 font-bold mx-auto">
+                            Sounds like: {connectedSpeech}
+                            </p>
+                        </GlassCard>
+
+                        <div className="grid grid-cols-3 gap-4 w-full">
+                            <Button onClick={() => setPhase(2)} className={`py-4 text-sm md:text-base ${phase >= 1 ? 'border-purple-500/50 bg-purple-900/30' : 'bg-[#2b2b2b]'}`}>
+                                <Icon name="volume-high" size={20} /> 1. MUMBLE
+                            </Button>
+                            <Button onClick={() => setPhase(3)} disabled={phase < 2} className={`py-4 text-sm md:text-base ${phase >= 2 ? 'border-purple-500/50 bg-purple-900/30' : 'bg-[#2b2b2b]'}`}>
+                                <Icon name="bolt" size={20} /> 2. SHADOW
+                            </Button>
+                            <Button onClick={handlePerform} disabled={phase < 3 || isPerforming || phase === 4} primary={phase === 3} className={`py-4 text-sm md:text-base ${isPerforming ? 'bg-purple-600 animate-pulse' : ''} ${phase === 4 ? 'bg-green-600' : ''}`}>
+                                {isPerforming ? <><Icon name="microphone" size={20} className="animate-bounce" /> GO!</> : phase === 4 ? <><Icon name="star" size={20} /> NATIVE!</> : <><Icon name="microphone" size={20} /> 3. SOLO</>}
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+                </div>
+            );
+        };
+
+        const MatchPairsSlide = ({ pairs, onWin }) => {
+            const [selectedLeft, setSelectedLeft] = useState(null);
+            const [selectedRight, setSelectedRight] = useState(null);
+            const [matched, setMatched] = useState([]);
+            
+            const leftCol = pairs.map((p, i) => ({ id: i, text: p.left }));
+            const rightIndices = [3, 0, 2, 1]; 
+            const rightCol = rightIndices.map(i => ({ id: i, text: pairs[i].right }));
+
+            useEffect(() => {
+                if (selectedLeft !== null && selectedRight !== null) {
+                if (selectedLeft === selectedRight) {
+                    const newMatched = [...matched, selectedLeft];
+                    setMatched(newMatched);
+                    setSelectedLeft(null);
+                    setSelectedRight(null);
+                    if (newMatched.length === pairs.length) onWin(400);
+                } else {
+                    setTimeout(() => { setSelectedLeft(null); setSelectedRight(null); }, 800);
+                }
+                }
+            }, [selectedLeft, selectedRight]);
+
+            return (
+                <div className="flex flex-col items-center justify-center h-full w-full max-w-6xl mx-auto p-8 animate-[fadeIn_0.5s_ease-out] relative">
+                <div className="bg-emerald-600/20 text-emerald-400 px-4 py-1 rounded-full text-sm font-bold mb-6 border border-emerald-500/30 flex items-center gap-2 uppercase tracking-widest">
+                    <Icon name="bolt" size={16}/> Neural Link Game
+                </div>
+                <h2 className="text-5xl font-black text-white mb-2 uppercase tracking-tight">Connect the Meaning</h2>
+                <p className="text-xl text-gray-400 mb-12">Tap an expression on the left, then its meaning on the right.</p>
+
+                <div className="flex w-full gap-8 md:gap-16">
+                    <div className="flex-1 flex flex-col gap-6">
+                    {leftCol.map(item => {
+                        const isMatched = matched.includes(item.id);
+                        const isSelected = selectedLeft === item.id;
+                        const isError = selectedLeft !== null && selectedRight !== null && selectedLeft === item.id && selectedLeft !== selectedRight;
+                        return (
+                        <GlassCard key={`l-${item.id}`} onClick={() => !isMatched && setSelectedLeft(item.id)}
+                            className={`py-8 text-center font-black text-2xl uppercase tracking-wide transition-all duration-300 bg-[#141414] border-white/5
+                            ${isMatched ? 'opacity-0 scale-90 pointer-events-none' : ''}
+                            ${isSelected ? 'bg-emerald-600/30 border-emerald-500 scale-105 shadow-[0_0_30px_rgba(16,185,129,0.3)]' : ''}
+                            ${isError ? 'bg-red-600/30 border-[#e50914] animate-[shake_0.5s_ease-in-out]' : 'hover:border-white/30'}`}>{item.text}</GlassCard>
+                        );
+                    })}
+                    </div>
+                    <div className="flex-1 flex flex-col gap-6">
+                    {rightCol.map(item => {
+                        const isMatched = matched.includes(item.id);
+                        const isSelected = selectedRight === item.id;
+                        const isError = selectedLeft !== null && selectedRight !== null && selectedRight === item.id && selectedLeft !== selectedRight;
+                        return (
+                        <GlassCard key={`r-${item.id}`} onClick={() => !isMatched && setSelectedRight(item.id)}
+                            className={`py-8 text-center font-medium text-xl text-gray-300 transition-all duration-300 bg-[#141414] border-white/5
+                            ${isMatched ? 'opacity-0 scale-90 pointer-events-none' : ''}
+                            ${isSelected ? 'bg-emerald-600/30 border-emerald-500 scale-105 shadow-[0_0_30px_rgba(16,185,129,0.3)]' : ''}
+                            ${isError ? 'bg-red-600/30 border-[#e50914] animate-[shake_0.5s_ease-in-out]' : 'hover:border-white/30'}`}>{item.text}</GlassCard>
+                        );
+                    })}
+                    </div>
+                </div>
+                
+                {matched.length === pairs.length && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#0a0a0a]/90 backdrop-blur-md z-50 animate-[fadeIn_0.5s_ease-out] rounded-3xl">
+                    <Icon name="trophy" size={120} className="text-yellow-400 mb-8 animate-bounce drop-shadow-[0_0_50px_rgba(250,204,21,0.5)]" />
+                    <h2 className="text-7xl font-black text-white mb-4 uppercase tracking-tighter" style={{fontFamily: "'Arial Black', Impact, sans-serif"}}>SYSTEM CLEARED!</h2>
+                    <p className="text-emerald-400 font-black text-4xl">+400 XP</p>
+                    </div>
+                )}
+                </div>
+            );
+        };
+
+        const SpeakingArenaSlide = () => {
+            return (
+                <div className="flex flex-col items-center justify-center h-full w-full max-w-7xl mx-auto p-8 animate-[fadeIn_0.5s_ease-out]">
+                <div className="bg-red-600/20 text-[#e50914] px-4 py-1 rounded-full text-sm font-bold mb-4 border border-[#e50914]/30 flex items-center gap-2 uppercase tracking-widest">
+                    <Icon name="shield-halved" size={16}/> Final Challenge
+                </div>
+                <h2 className="text-6xl font-black text-white mb-2 uppercase tracking-tighter" style={{fontFamily: "'Arial Black', Impact, sans-serif"}}>The Speaking Arena</h2>
+                <p className="text-xl text-gray-400 mb-10">Pair up. It's time for the ultimate roleplay.</p>
+
+                <div className="flex flex-col md:flex-row w-full gap-8">
+                    <div className="flex-1 bg-gradient-to-br from-blue-900/40 to-[#141414] border-t-4 border-t-blue-500 rounded-3xl p-8 relative overflow-hidden shadow-2xl">
+                    <div className="absolute top-4 right-4 text-6xl opacity-50">🍕</div>
+                    <h3 className="text-3xl font-black text-white mb-6 uppercase">Actor A: Joey</h3>
+                    <p className="text-gray-300 text-lg mb-6 leading-relaxed">
+                        You are extremely protective of your food. Your date just reached for your plate.
+                    </p>
+                    <div className="bg-black/50 p-4 rounded-xl border border-white/5">
+                        <p className="text-blue-400 font-bold uppercase text-xs mb-2">Must use:</p>
+                        <ul className="text-white font-medium space-y-2">
+                        <li>"What are you doing?"</li>
+                        <li>"I never share food!"</li>
+                        </ul>
+                    </div>
+                    </div>
+
+                    <div className="flex-none flex items-center justify-center font-black text-6xl italic text-gray-700">VS</div>
+
+                    <div className="flex-1 bg-gradient-to-br from-purple-900/40 to-[#141414] border-t-4 border-t-purple-500 rounded-3xl p-8 relative overflow-hidden shadow-2xl">
+                    <div className="absolute top-4 right-4 text-6xl opacity-50">🥗</div>
+                    <h3 className="text-3xl font-black text-white mb-6 uppercase">Actor B: Sarah</h3>
+                    <p className="text-gray-300 text-lg mb-6 leading-relaxed">
+                        You ordered a salad but you are still hungry. You just want one fry. It's not a big deal!
+                    </p>
+                    <div className="bg-black/50 p-4 rounded-xl border border-white/5">
+                        <p className="text-purple-400 font-bold uppercase text-xs mb-2">Must use:</p>
+                        <ul className="text-white font-medium space-y-2">
+                        <li>"It's just one fry."</li>
+                        <li>"Don't make a big deal."</li>
+                        </ul>
+                    </div>
+                    </div>
+                </div>
+                </div>
+            );
+        };
+
+        // ==========================================
+        // 📚 EXACT 27-PAGE LESSON STRUCTURE 
+        // ==========================================
+
+        const SLIDES_DATA = [
+            { type: "intro", tip: "Welcome to Wolfflix Engine. Start by showing the premium cover to build anticipation." }, // 1
+            { type: "vocabFocus", word: "Fries", emoji: "🍟", definition: "A classic side dish made of fried potatoes.", followUp: "What is the best sauce for fries?", starters: ["Ketchup", "Mayonnaise", "Mustard", "Barbecue", "No sauce!"], tip: "Click 'Reveal Discussion' to break the ice." }, // 2
+            { type: "vocabFocus", word: "Garden Salad", emoji: "🥗", definition: "A healthy mix of lettuce and vegetables.", followUp: "Do you ever order salad at a restaurant?", starters: ["Yes, always", "Sometimes", "Never!", "Only if I'm on a diet"], tip: "Keep the pacing fast." }, // 3
+            { type: "vocabFocus", word: "Dessert", emoji: "🍰", definition: "Sweet food eaten at the end of a meal.", followUp: "If you could only eat one dessert forever, what is it?", starters: ["Cheesecake", "Ice Cream", "Brownie", "Chocolate Cake"], tip: "Use the Timer tool for 60s here." }, // 4
+            { type: "dilemma", title: "The Dilemma", question: "Your date takes one of your fries. What do you do?", options: [{ text: "SMILE AND SHARE", sub: "Be polite and friendly." }, { text: "SAY NO!", sub: "Protect your food." }, { text: "ORDER MORE", sub: "The smart solution." }], bgImage: BG_FRIES, tip: "Read the dilemma. Remind them to use the speaking starters at the bottom." }, // 5
+            { type: "video", title: "The Incident", start: 0, end: 85, mission: "Watch Sarah's hand. What does she do?", tip: "Do not pause the video. Let them feel the natural comedy." }, // 6
+            { type: "spotifyScript", title: "Act I: Setting the Scene", 
+                scriptLines: [
+                { text: "We were out to dinner.", focus: { word: "Out to dinner", meaning: "Eating at a restaurant.", grammarNote: "Past Simple sets the general time.", followUp: "Do you prefer eating out or cooking at home?"} },
+                { text: "We were getting along...", focus: { word: "Getting along", meaning: "Having a friendly relationship.", grammarNote: "Notice 'We were + Verb(ing)'. This is Past Continuous.", followUp: "Who is someone you get along with really well?"} }
+                ], tip: "Click the script lines to show the new Follow-up Question feature!"
+            }, // 7
+            { type: "spotifyScript", title: "Act I: The Interruption", 
+                scriptLines: [
+                { text: "Having a really nice time.", focus: { word: "Having a nice time", meaning: "Enjoying the moment.", grammarNote: "Continuous action in the past.", followUp: "What do you do to have a nice time on weekends?"} },
+                { text: "And then, out of nowhere...", focus: { word: "Out of nowhere", meaning: "Suddenly and unexpectedly.", grammarNote: "Phrase used to introduce an interruption.", followUp: "Tell me about a time something good happened out of nowhere."} }
+                ], tip: "Focus on the transition phrase 'Out of nowhere'."
+            }, // 8
+            { type: "quiz", question: "What does 'out of nowhere' mean?", options: ["Happening very slowly.", "Happening in a specific place.", "Happening suddenly and unexpectedly.", "Not happening at all."], answerIndex: 2, explanation: "We use 'out of nowhere' to describe a sudden, surprising event.", followUp: "Tell us about a time something good happened out of nowhere.", tip: "Vocabulary check before grammar." }, // 9
+            { type: "grammar", tip: "Toggle between Background Action and Interruption to teach induction." }, // 10
+            { type: "builder", words: ["We", "were", "getting", "along", "when", "she", "took", "a", "fry."], tip: "Have the class shout the correct order." }, // 11
+            { type: "quiz", question: "Which sentence is correct?", options: ["I was eating when he calls me.", "I was eating when he called me.", "I ate when he was calling me.", "I ate when he called me."], answerIndex: 1, explanation: "We use the Past Continuous ('was eating') for the long background action, and the Past Simple ('called') for the short interruption.", followUp: "Can you give me an example of an interruption that happened to you today?", tip: "This is a quick Wordwall-style check." }, // 12
+            { type: "discussion", question: "What were you doing yesterday at 8 PM?", hint: "Use Past Continuous (I was + Verb-ing)", tip: "Open the Whiteboard to type out their sentences live." }, // 13
+            { type: "shadowIntro", tip: "Explain the gym analogy: speaking requires muscle memory." }, // 14
+            { type: "shadowing", title: "Speak like Phoebe", phrase: "What are you talking about?", connectedSpeech: "Whaddaya talkin' bout?", start: 8, end: 11, tip: "Watch the video loop. Then use the buttons to Mumble, Shadow, and Perform." }, // 15
+            { type: "video", title: "The Retaliation", start: 122, end: 200, mission: "What is Joey's excuse to eat her dessert?", tip: "Play the second half of the scene." }, // 16
+            { type: "spotifyScript", title: "Act II: The Excuse", 
+                scriptLines: [
+                { text: "I'll just have a garden salad.", focus: { word: "Garden Salad", meaning: "A basic salad.", grammarNote: "Future Simple 'I will have' for instant decisions.", followUp: "What do you usually order when you want to be healthy?"} },
+                { text: "I'm trying to be healthy.", focus: { word: "Trying to be", meaning: "Making an effort.", grammarNote: "Present Continuous for a current ongoing goal.", followUp: "What are you trying to do right now in your life?"} }
+                ], tip: "Discuss restaurant ordering habits."
+            }, // 17
+            { type: "spotifyScript", title: "Act II: The Rule", 
+                scriptLines: [
+                { text: "There seems to be some sort of red crap...", focus: { word: "Red crap", meaning: "Derogatory way to refer to the elegant sauce.", grammarNote: "'Crap' is informal for junk.", followUp: "What is a food you think tastes like 'crap'?"} },
+                { text: "This is a two-way street!", focus: { word: "Two-way street", meaning: "A situation that requires equal compromise.", grammarNote: "Idiom. If she eats his food, he can eat hers.", followUp: "Do you agree that relationships are a two-way street?"} }
+                ], tip: "The idiom 'Two-way street' is highly valuable."
+            }, // 18
+            { type: "quiz", question: "What does Joey mean by 'red crap'?", options: ["He loves the sauce.", "He is using an informal word for something unwanted.", "He wants ketchup.", "He thinks it's a vegetable."], answerIndex: 1, explanation: "'Crap' is an informal, slightly rude word meaning junk or something bad.", followUp: "What is a food that you think tastes like 'crap'?", tip: "Cultural slang check." }, // 19
+            { type: "shadowing", title: "Speak like Joey", phrase: "This is a two-way street.", connectedSpeech: "Thisizza two-way street.", start: 182, end: 187, tip: "Notice how 'This is a' links together." }, // 20
+            { type: "debate", title: "Joey's Attitude", question: "Do you think Joey overreacted, or was he right to defend his food?", vocabHints: ["Two-way street", "Big deal", "Out of nowhere", "Get along"], tip: "Encourage them to use the vocabulary boxes. Use the Timer tool for 60s per student." }, // 21
+            { type: "match", pairs: [
+                { left: "Big deal", right: "It's not important" },
+                { left: "Out of nowhere", right: "Suddenly and unexpectedly" },
+                { left: "Get along", right: "Have a friendly relationship" },
+                { left: "Two-way street", right: "Fair for both sides" }
+                ], tip: "Have the class shout the answers." 
+            }, // 22
+            { type: "builder", words: ["If", "she", "eats", "my", "food", "I", "will", "eat", "hers."], tip: "A quick First Conditional check." }, // 23
+            { type: "quiz", question: "What does 'set you up' mean?", options: ["To build a table.", "To arrange a date for a friend.", "To make someone angry.", "To stand up straight."], answerIndex: 1, explanation: "In dating contexts, 'setting someone up' means introducing two people, hoping they will start a romantic relationship.", followUp: "Would you let your friends set you up on a blind date?", tip: "Another quick check. Spark a funny debate with the follow-up question." }, // 24
+            { type: "speakingArena", tip: "Put two students on the spot. Use the Timer tool to give them 60 seconds to act it out." }, // 25
+            { type: "dilemma", title: "The Final Dilemma", question: "Would you go on a second date with Joey?", options: [{ text: "YES, WHY NOT?", sub: "It was a funny misunderstanding." }, { text: "NO WAY!", sub: "He is too crazy about food." }, { text: "ONLY IF HE PAYS", sub: "Free food is free food." }], bgImage: BG_DINER, tip: "Wrap up the class with this final opinion discussion." }, // 26
+            { type: "end", tip: "Show the final XP. Tell them to click 'My Homework' on their student dashboard." } // 27
+        ];
+
+        // --- MAIN APPLICATION ---
+        function App() {
+            const [started, setStarted] = useState(false);
+            const [slideIdx, setSlideIdx] = useState(0);
+            const [xp, setXp] = useState(0);
+            const [hud, setHud] = useState(false);
+            const [completed, setCompleted] = useState(new Set());
+            const [isAppFullscreen, setIsAppFullscreen] = useState(false);
+
+            useEffect(() => {
+                const handleFsChange = () => setIsAppFullscreen(!!document.fullscreenElement);
+                document.addEventListener('fullscreenchange', handleFsChange);
+                return () => document.removeEventListener('fullscreenchange', handleFsChange);
+            }, []);
+
+            const toggleAppFullscreen = async () => {
+                try {
+                    if (!document.fullscreenElement && !isAppFullscreen) {
+                        if (document.documentElement.requestFullscreen) {
+                            await document.documentElement.requestFullscreen();
+                        } else {
+                            setIsAppFullscreen(true);
+                        }
+                    } else {
+                        if (document.exitFullscreen && document.fullscreenElement) {
+                            await document.exitFullscreen();
+                        } else {
+                            setIsAppFullscreen(false);
+                        }
+                    }
+                } catch (e) {
+                    console.warn("Fullscreen API not allowed here:", e);
+                    setIsAppFullscreen(!isAppFullscreen);
+                }
+            };
+
+            const addXp = (amount) => {
+                setXp(x => x + amount);
+                if (!completed.has(slideIdx) && amount !== 50) {
+                setCompleted(prev => new Set(prev).add(slideIdx));
+                }
+            };
+
+            const next = () => { if (slideIdx < SLIDES_DATA.length - 1) setSlideIdx(s => s + 1); };
+            const prev = () => { if (slideIdx > 0) setSlideIdx(s => s - 1); };
+
+            if (!started) {
+                return (
+                    <div className={`w-full bg-[#0a0a0a] font-sans overflow-hidden flex flex-col relative selection:bg-[#e50914]/30 text-white ${isAppFullscreen && !document.fullscreenElement ? 'fixed inset-0 z-[9999] h-[100dvh] w-screen' : 'h-screen'}`}>
+                        <div className="fixed top-6 right-6 z-[60] flex items-center gap-3">
+                            <button onClick={toggleAppFullscreen} className={`w-14 h-14 rounded-full flex items-center justify-center transition-all shadow-2xl ${isAppFullscreen ? 'bg-[#141414]/80 text-[#e50914] border-[#e50914] shadow-[0_0_20px_rgba(229,9,20,0.3)]' : 'bg-[#141414]/80 backdrop-blur-md text-gray-400 border-white/10 hover:text-white hover:border-white/30 hover:scale-105'}`} title="Toggle Fullscreen">
+                                <Icon name={isAppFullscreen ? "compress" : "expand"} size={24} />
+                            </button>
+                        </div>
+                        <TeacherGuideSlide startLesson={() => setStarted(true)} toggleFs={toggleAppFullscreen} isFs={isAppFullscreen} />
+                    </div>
+                );
+            }
+
+            const current = SLIDES_DATA[slideIdx];
+
+            const renderSlide = () => {
+                switch (current.type) {
+                case "intro": return <CoverSlide nextSlide={next} />;
+                case "vocabFocus": return <VocabFocusSlide word={current.word} emoji={current.emoji} definition={current.definition} followUp={current.followUp} starters={current.starters} />;
+                case "discussion": return <DiscussionSlide question={current.question} hint={current.hint} />;
+                case "debate": return <DebateSlide title={current.title} question={current.question} vocabHints={current.vocabHints} />;
+                case "dilemma": return <DilemmaSlide title={current.title} question={current.question} options={current.options} bgImage={current.bgImage} onWin={addXp} />;
+                case "video": return <VideoSlide title={current.title} start={current.start} end={current.end} mission={current.mission} />;
+                case "spotifyScript": return <SpotifyScriptSlide title={current.title} scriptLines={current.scriptLines} />;
+                case "grammar": return <GrammarSlide />;
+                case "builder": return <BuilderSlide words={current.words} onWin={addXp} />;
+                case "quiz": return <QuizSlide question={current.question} options={current.options} answerIndex={current.answerIndex} explanation={current.explanation} followUp={current.followUp} onWin={addXp} />;
+                case "shadowIntro": return <ShadowingIntroSlide />;
+                case "shadowing": return <ShadowingStudioSlide title={current.title} phrase={current.phrase} connectedSpeech={current.connectedSpeech} start={current.start} end={current.end} onComplete={addXp} />;
+                case "match": return <MatchPairsSlide pairs={current.pairs} onWin={addXp} />;
+                case "speakingArena": return <SpeakingArenaSlide />;
+                case "end":
+                    return (
+                    <div className="flex flex-col items-center justify-center h-full text-center p-8 animate-[fadeIn_0.5s_ease-out]">
+                        <Icon name="trophy" size={120} className="text-yellow-400 mb-8 drop-shadow-[0_0_50px_rgba(250,204,21,0.6)] animate-bounce" />
+                        <h1 className="text-7xl md:text-9xl font-black mb-6 text-white uppercase tracking-tighter" style={{fontFamily: "'Arial Black', Impact, sans-serif"}}>EPISODE COMPLETE</h1>
+                        <GlassCard className="mb-12 bg-[#e50914]/10 border-[#e50914]/30 px-20 py-10 inline-block shadow-[0_0_60px_rgba(229,9,20,0.15)]">
+                        <p className="text-[#e50914] font-bold uppercase tracking-widest text-lg mb-2">Total XP Earned</p>
+                        <p className="text-8xl font-black text-white">{xp} XP</p>
+                        </GlassCard>
+                        <div className="flex items-center gap-6">
+                        <Button variant="netflix-white" className="px-10 py-5 text-xl uppercase tracking-wider">
+                            <Icon name="play" size={24} className="text-black" /> Watch Next Episode
+                        </Button>
+                        <Button variant="netflix-dark" className="px-10 py-5 text-xl uppercase tracking-wider">
+                            <Icon name="plus" size={24} /> Access Homework
+                        </Button>
+                        </div>
+                    </div>
+                    );
+                default: return <div className="text-white text-2xl">Error loading module.</div>;
+                }
+            };
+
+            return (
+                <div className={`w-full bg-[#0a0a0a] font-sans overflow-hidden flex flex-col relative selection:bg-[#e50914]/30 text-white ${isAppFullscreen && !document.fullscreenElement ? 'fixed inset-0 z-[9999] h-[100dvh] w-screen' : 'h-screen'}`}>
+                
+                <div className="fixed top-6 right-6 z-[60] flex items-center gap-3">
+                    {slideIdx > 0 && (
+                        <React.Fragment>
+                            <div className="flex items-center gap-2 bg-[#141414]/80 border border-white/10 px-5 h-14 rounded-full backdrop-blur-md shadow-lg mr-2">
+                                <Icon name="star" size={18} className="text-yellow-400" />
+                                <span className="font-bold text-yellow-400 text-lg">{xp} XP</span>
+                            </div>
+                            <button onClick={() => setHud(!hud)} className={`w-14 h-14 rounded-full border transition-all shadow-2xl flex items-center justify-center ${hud ? 'bg-[#e50914] text-white border-transparent shadow-[0_0_20px_rgba(229,9,20,0.5)]' : 'bg-[#141414]/80 backdrop-blur-md text-gray-400 border-white/10 hover:text-white hover:border-white/30 hover:scale-105'}`} title="Toggle HUD">
+                                {hud ? <Icon name="eye" size={24} /> : <Icon name="eye-slash" size={24} />}
+                            </button>
+                        </React.Fragment>
+                    )}
+                    <button onClick={toggleAppFullscreen} className={`w-14 h-14 rounded-full border transition-all shadow-2xl flex items-center justify-center ${isAppFullscreen ? 'bg-[#141414]/80 text-[#e50914] border-[#e50914] shadow-[0_0_20px_rgba(229,9,20,0.3)]' : 'bg-[#141414]/80 backdrop-blur-md text-gray-400 border-white/10 hover:text-white hover:border-white/30 hover:scale-105'}`} title="Toggle Fullscreen">
+                        <Icon name={isAppFullscreen ? "compress" : "expand"} size={24} />
+                    </button>
+                </div>
+
+                <TeacherTools addXp={addXp} />
+
+                {slideIdx > 0 && (
+                    <div 
+                    className="absolute inset-0 z-0 bg-cover bg-center opacity-20 mix-blend-luminosity transition-all duration-1000 scale-105" 
+                    style={{ backgroundImage: `url(${slideIdx > 15 ? BG_CAKE : BG_DINER})` }} 
+                    />
+                )}
+                
+                {slideIdx > 0 && (
+                    <div className="z-30 w-full p-6 flex justify-between items-center bg-gradient-to-b from-[#0a0a0a] via-[#0a0a0a]/80 to-transparent absolute top-0 pointer-events-none">
+                    <h1 className="text-white font-black tracking-widest text-xl drop-shadow-md flex items-center gap-3 ml-24 pointer-events-auto">
+                        <div className="w-8 h-8 bg-[#e50914] text-white flex items-center justify-center text-lg shadow-lg">W</div>
+                        <span className="opacity-80 hidden md:block">WOLFFLIX</span>
+                    </h1>
+                    </div>
+                )}
+
+                {hud && current.tip && slideIdx > 0 && (
+                    <div className="absolute top-24 left-1/2 transform -translate-x-1/2 z-[40] bg-[#141414]/95 backdrop-blur-2xl border border-blue-500/50 text-blue-50 px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-4 w-[90%] max-w-2xl animate-[slideInDown_0.3s_ease-out]">
+                    <div className="bg-blue-600/20 p-2 rounded-full border border-blue-500/30"><Icon name="display" size={24} className="text-blue-400" /></div>
+                    <div>
+                        <p className="text-xs text-blue-400 font-bold uppercase tracking-widest mb-1">Director's Note</p>
+                        <p className="font-medium text-[15px]">{current.tip}</p>
+                    </div>
+                    </div>
+                )}
+
+                <div className="flex-1 relative z-10 w-full h-full overflow-y-auto overflow-x-hidden pt-16 pb-24 flex items-center">
+                    {renderSlide()}
+                </div>
+
+                {slideIdx > 0 && (
+                    <div className="z-30 w-full bg-gradient-to-t from-[#0a0a0a] via-[#0a0a0a]/95 to-transparent p-6 absolute bottom-0 flex flex-col items-center">
+                    <div className="max-w-6xl w-full flex flex-col gap-5">
+                        <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                        <div className="h-full bg-[#e50914] transition-all duration-500 ease-out shadow-[0_0_10px_rgba(229,9,20,0.8)]" style={{ width: `${((slideIdx) / (SLIDES_DATA.length - 1)) * 100}%` }} />
+                        </div>
+                        
+                        <div className="flex justify-between items-center w-full relative">
+                        <Button onClick={prev} disabled={slideIdx === 0} className="px-4 py-2 bg-transparent hover:bg-white/5 border-none">
+                            <Icon name="arrow-left" size={18} /> BACK
+                        </Button>
+                        
+                        <div className="absolute left-1/2 transform -translate-x-1/2 text-gray-500 font-bold tracking-[0.2em] text-xs md:text-sm uppercase hidden sm:block">
+                            PAGE {slideIdx + 1} OF {SLIDES_DATA.length}
+                        </div>
+
+                        <Button onClick={next} variant="netflix-white" disabled={slideIdx === SLIDES_DATA.length - 1} className="px-8 py-2 border-none">
+                            NEXT <Icon name="arrow-right" size={18} className="text-black" />
+                        </Button>
+                        </div>
+                    </div>
+                    </div>
+                )}
+            </div>
+        );
+        }
+        
+        // Initialize the React application
+        const rootElement = document.getElementById('root');
+        const root = ReactDOM.createRoot(rootElement);
+        root.render(<App />);
+
+    </script>
+</body>
+</html>
